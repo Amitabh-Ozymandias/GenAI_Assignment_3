@@ -64,9 +64,12 @@ const handleDocumentIngestion = async (req, res) => {
     if (fileExtension === ".pdf") {
       const fileBuffer = readFileSync(tempFilePath);
       const parsedOutput = await pdfParse(fileBuffer);
+      console.log(`[Upload] PDF text length: ${parsedOutput.text.length}`);
+      console.log(`[Upload] PDF text preview: "${parsedOutput.text.substring(0, 300)}..."`);
       documentItems = [{ pageContent: parsedOutput.text, metadata: { source: fileName } }];
     } else if (fileExtension === ".txt") {
       const fileText = readFileSync(tempFilePath, "utf-8");
+      console.log(`[Upload] TXT text length: ${fileText.length}`);
       documentItems = [{ pageContent: fileText, metadata: { source: fileName } }];
     }
 
@@ -76,6 +79,7 @@ const handleDocumentIngestion = async (req, res) => {
       chunkOverlap: 200,
     });
     const documentChunks = await textSplitter.splitDocuments(documentItems);
+    console.log(`[Upload] Created ${documentChunks.length} chunks`);
 
     // Generate embeddings and store in Qdrant
     const embeddingService = new OpenAIEmbeddings({
@@ -84,10 +88,12 @@ const handleDocumentIngestion = async (req, res) => {
       configuration: { baseURL: AZURE_AI_BASE_URL },
     });
 
+    console.log(`[Upload] Storing in Qdrant collection: ${chatSessionId}`);
     await QdrantVectorStore.fromDocuments(documentChunks, embeddingService, {
       ...getVectorDbSettings(),
       collectionName: chatSessionId,
     });
+    console.log(`[Upload] Successfully stored in Qdrant`);
 
     unlinkSync(tempFilePath);
     return res.json({ sessionId: chatSessionId, chunks: documentChunks.length });
@@ -108,6 +114,8 @@ const handleChatRequest = async (req, res) => {
   }
 
   try {
+    console.log(`[Chat] Session: ${chatSessionId}, Query: "${userQuery}"`);
+
     const embeddingService = new OpenAIEmbeddings({
       model: EMBEDDING_MODEL,
       apiKey: AI_API_KEY,
@@ -119,9 +127,20 @@ const handleChatRequest = async (req, res) => {
       collectionName: chatSessionId,
     });
 
-    // Fetch top 5 related chunks
-    const chunkRetriever = qdrantStore.asRetriever({ k: 5 });
-    const relevantChunks = await chunkRetriever.invoke(userQuery);
+    // Use similaritySearchWithScore to see actual scores
+    const searchResults = await qdrantStore.similaritySearchWithScore(userQuery, 5);
+
+    console.log(`[Chat] Retrieved ${searchResults.length} chunks`);
+    searchResults.forEach(([doc, score], i) => {
+      console.log(`  Chunk ${i + 1}: score=${score}, preview="${doc.pageContent.substring(0, 100)}..."`);
+    });
+
+    const relevantChunks = searchResults.map(([doc]) => doc);
+
+    if (relevantChunks.length === 0) {
+      console.log("[Chat] No chunks retrieved from Qdrant!");
+      return res.json({ answer: "I couldn't find that in the document. (No chunks retrieved from vector store)" });
+    }
 
     const contextString = relevantChunks
       .map((chunk, index) => {
@@ -134,17 +153,22 @@ const handleChatRequest = async (req, res) => {
       })
       .join("\n\n---\n\n");
 
+    console.log(`[Chat] Context length: ${contextString.length} chars`);
+
     const llmClient = new OpenAI({ baseURL: AZURE_AI_BASE_URL, apiKey: AI_API_KEY });
 
-    const systemPrompt = `You are a helpful AI assistant. Answer the user's question relying strictly on the document context below. Do not utilize outside information. If the context does not contain the answer, simply state "I couldn't find that in the document."\n\nDocument context:\n${contextString}`;
+    const systemPrompt = `You are a helpful AI assistant. Answer the user's question based on the document context below. Use the information provided to give a thorough answer. If the context truly does not contain relevant information, state "I couldn't find that in the document."\n\nDocument context:\n${contextString}`;
 
     const completion = await llmClient.chat.completions.create({
       model: CHAT_MODEL,
+      temperature: 0,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userQuery },
       ],
     });
+
+    console.log(`[Chat] LLM response: "${completion.choices[0].message.content.substring(0, 200)}..."`);
 
     return res.json({ answer: completion.choices[0].message.content });
   } catch (error) {
@@ -152,6 +176,35 @@ const handleChatRequest = async (req, res) => {
     return res.status(500).json({ error: error.message });
   }
 };
+
+// Debug endpoint to check what's in Qdrant
+server.get("/debug/:sessionId", async (req, res) => {
+  try {
+    const embeddingService = new OpenAIEmbeddings({
+      model: EMBEDDING_MODEL,
+      apiKey: AI_API_KEY,
+      configuration: { baseURL: AZURE_AI_BASE_URL },
+    });
+
+    const qdrantStore = await QdrantVectorStore.fromExistingCollection(embeddingService, {
+      ...getVectorDbSettings(),
+      collectionName: req.params.sessionId,
+    });
+
+    const results = await qdrantStore.similaritySearch("test", 3);
+    res.json({
+      sessionId: req.params.sessionId,
+      chunksFound: results.length,
+      chunks: results.map((doc, i) => ({
+        index: i,
+        contentPreview: doc.pageContent.substring(0, 200),
+        metadata: doc.metadata,
+      })),
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // Routes
 server.post("/upload", fileUploader.single("file"), handleDocumentIngestion);
