@@ -8,7 +8,7 @@ import { v4 as generateUuid } from "uuid";
 
 // LangChain and LLM dependencies
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
-import { PDFParse } from "pdf-parse";
+import pdfParse from "pdf-parse";
 import { OpenAIEmbeddings } from "@langchain/openai";
 import { QdrantVectorStore } from "@langchain/qdrant";
 import { OpenAI } from "openai";
@@ -63,9 +63,7 @@ const handleDocumentIngestion = async (req, res) => {
     // Extract text depending on file type
     if (fileExtension === ".pdf") {
       const fileBuffer = readFileSync(tempFilePath);
-      const pdfParser = new PDFParse({ data: fileBuffer });
-      await pdfParser.load(fileBuffer);
-      const parsedOutput = await pdfParser.getText();
+      const parsedOutput = await pdfParse(fileBuffer);
       documentItems = [{ pageContent: parsedOutput.text, metadata: { source: fileName } }];
     } else if (fileExtension === ".txt") {
       const fileText = readFileSync(tempFilePath, "utf-8");
