@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@langchain/community": "^0.3.0",
-    "@langchain/core": "^1.1.45",
+    "@langchain/core": "^0.3.58",
     "@langchain/openai": "^0.3.0",
     "@langchain/qdrant": "^0.1.0",
     "dotenv": "^16.0.0",
