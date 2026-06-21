@@ -8,7 +8,9 @@ import { v4 as generateUuid } from "uuid";
 
 // LangChain and LLM dependencies
 import { RecursiveCharacterTextSplitter } from "langchain/text_splitter";
-import pdfParse from "pdf-parse/lib/pdf-parse.js";
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
+const pdfParse = require("pdf-parse/lib/pdf-parse.js");
 import { OpenAIEmbeddings } from "@langchain/openai";
 import { QdrantVectorStore } from "@langchain/qdrant";
 import { OpenAI } from "openai";
