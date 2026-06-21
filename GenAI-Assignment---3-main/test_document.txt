@@ -1,0 +1,24 @@
+Master Services Agreement
+
+This Master Services Agreement ("Agreement") is entered into between TechCorp Inc. ("Provider") and ClientCo LLC ("Client") as of January 1, 2025.
+
+1. Scope of Services
+The Provider agrees to deliver software development, maintenance, and consulting services as described in individual Statements of Work (SOWs) executed under this Agreement.
+
+2. Term and Termination
+This Agreement shall remain in effect for a period of two (2) years from the Effective Date. Either party may terminate this Agreement with 90 days written notice.
+
+3. Payment Terms
+Client shall pay Provider within 30 days of receipt of invoice. Late payments shall accrue interest at a rate of 1.5% per month.
+
+4. Confidentiality
+Both parties agree to maintain the confidentiality of all proprietary information disclosed during the term of this Agreement. This obligation survives termination.
+
+5. Intellectual Property
+All work product created under this Agreement shall be owned by Client upon full payment. Provider retains rights to pre-existing tools and methodologies.
+
+6. Limitation of Liability
+Neither party shall be liable for indirect, incidental, or consequential damages. Provider's total liability shall not exceed the fees paid in the 12 months preceding the claim.
+
+7. Governing Law
+This Agreement shall be governed by the laws of the State of Delaware.
